@@ -3,7 +3,6 @@ import os
 import google.generativeai as genai
 import requests
 
-# Initialisation de l'application Flask
 app = Flask(__name__)
 
 # Configuration de l'API Gemini
@@ -11,6 +10,9 @@ genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
 # Dictionnaire pour stocker les sessions de conversation par user_id
 chat_sessions = {}
+
+# Compteur global pour user_id
+current_user_id = 1
 
 def download_image(url):
     """Télécharge une image depuis une URL et l'enregistre localement."""
@@ -63,40 +65,50 @@ def start_or_continue_chat(user_id, text, image_url=None):
 
     return response.text
 
-# Route pour gérer les requêtes avec 'text' et éventuellement 'image_url'
 @app.route('/api/pro_with_image', methods=['GET'])
 def process_text_and_image():
+    global current_user_id
+
     text = request.args.get('text')
     image_url = request.args.get('image_url')
-    user_id = request.args.get('user_id')
 
-    if text and user_id:
-        try:
-            # Continue la conversation ou démarre une nouvelle session
-            response_text = start_or_continue_chat(user_id, text, image_url)
-            return jsonify({"response": response_text})
+    if not text:
+        return jsonify({"error": "Missing 'text' parameter"}), 400
 
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+    # Génère un user_id automatiquement
+    user_id = current_user_id
 
-    return jsonify({"error": "Invalid parameters"}), 400
+    try:
+        # Continue la conversation ou démarre une nouvelle session
+        response_text = start_or_continue_chat(user_id, text, image_url)
+        # Incrémente l'ID pour le prochain utilisateur
+        current_user_id += 1
+        return jsonify({"user_id": user_id, "response": response_text})
 
-# Route pour gérer uniquement les requêtes avec du texte
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/pro_text_only', methods=['GET'])
 def process_text_only():
+    global current_user_id
+
     text = request.args.get('text')
-    user_id = request.args.get('user_id')
 
-    if text and user_id:
-        try:
-            # Continue la conversation avec uniquement du texte
-            response_text = start_or_continue_chat(user_id, text)
-            return jsonify({"response": response_text})
+    if not text:
+        return jsonify({"error": "Missing 'text' parameter"}), 400
 
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+    # Génère un user_id automatiquement
+    user_id = current_user_id
 
-    return jsonify({"error": "Invalid parameters"}), 400
+    try:
+        # Continue la conversation avec uniquement du texte
+        response_text = start_or_continue_chat(user_id, text)
+        # Incrémente l'ID pour le prochain utilisateur
+        current_user_id += 1
+        return jsonify({"user_id": user_id, "response": response_text})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # Lancement de l'application sur le host 0.0.0.0
 if __name__ == '__main__':
