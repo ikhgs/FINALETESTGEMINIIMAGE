@@ -9,7 +9,7 @@ genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 app = Flask(__name__)
 
 # Route pour gérer les requêtes avec 'text' et 'image_url'
-@app.route('/api/pro', methods=['GET'])
+@app.route('/api/pro_with_image', methods=['GET'])
 def process_text_and_image():
     text = request.args.get('text')
     image_url = request.args.get('image_url')
@@ -37,7 +37,7 @@ def process_text_and_image():
     return jsonify({"error": "Invalid parameters"}), 400
 
 # Route pour gérer les requêtes avec seulement 'text'
-@app.route('/api/promotion', methods=['GET'])
+@app.route('/api/pro_text_only', methods=['GET'])
 def process_text():
     text = request.args.get('text')
 
