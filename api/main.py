@@ -37,7 +37,7 @@ def process_text_and_image():
     return jsonify({"error": "Invalid parameters"}), 400
 
 # Route pour gérer les requêtes avec seulement 'text'
-@app.route('/api/pro', methods=['GET'])
+@app.route('/api/promotion', methods=['GET'])
 def process_text():
     text = request.args.get('text')
 
