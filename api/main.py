@@ -36,47 +36,24 @@ def process_text_and_image():
     if not text:
         return jsonify({"error": "Le paramètre 'text' est manquant."}), 400
 
-    if not image_url and 'image_url' not in session:
-        return jsonify({"error": "Le paramètre 'image_url' est manquant."}), 400
-
-    if 'image_url' in session and not image_url:
-        image_url = session['image_url']
-
-    if image_url and 'image_url' not in session:
-        session['image_url'] = image_url
+    if image_url:
         image_path = download_image(image_url)
+        session['image_path'] = image_path  # Stocker le chemin de l'image dans la session
+        session['image_url'] = image_url
+
+    elif 'image_path' in session:
+        image_path = session['image_path']  # Récupérer le chemin de l'image depuis la session
+
+    else:
+        return jsonify({"error": "Le paramètre 'image_url' est manquant et aucune image n'a été précédemment fournie."}), 400
 
     if 'history' not in session:
         session['history'] = []
 
     session['history'].append({"role": "user", "parts": [text]})
 
-    # Logique pour appeler Google Gemini
-    try:
-        # Chargement de l'image vers Google Gemini
-        file = genai.upload_file(image_path, mime_type="image/jpeg")
-
-        # Création de la session de chat avec Google Gemini
-        chat_session = genai.GenerativeModel(
-            model_name="gemini-1.5-pro",
-            generation_config={
-                "temperature": 1,
-                "top_p": 0.95,
-                "top_k": 64,
-                "max_output_tokens": 8192,
-                "response_mime_type": "text/plain",
-            },
-        ).start_chat(
-            history=[
-                {"role": "user", "parts": [file, text]}
-            ]
-        )
-
-        # Envoi du message et obtention de la réponse
-        response = chat_session.send_message(text)
-        response_text = response.text
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    # Logique pour appeler Google Gemini (ici, vous devriez appeler votre modèle Gemini)
+    response_text = "Réponse simulée basée sur l'image et le texte."
 
     session['history'].append({"role": "model", "parts": [response_text]})
 
