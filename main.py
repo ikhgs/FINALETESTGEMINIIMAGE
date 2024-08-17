@@ -21,9 +21,10 @@ def download_image(url):
     """Télécharge une image depuis une URL et l'enregistre localement."""
     response = requests.get(url)
     if response.status_code == 200:
-        with open("temp_image.jpg", "wb") as f:
+        image_path = "temp_image.jpg"
+        with open(image_path, "wb") as f:
             f.write(response.content)
-        return "temp_image.jpg"
+        return image_path
     else:
         raise Exception("Échec du téléchargement de l'image.")
 
@@ -43,7 +44,7 @@ def process_text_and_image():
 
     if image_url and 'image_url' not in session:
         session['image_url'] = image_url
-        download_image(image_url)
+        image_path = download_image(image_url)
 
     if 'history' not in session:
         session['history'] = []
@@ -51,7 +52,31 @@ def process_text_and_image():
     session['history'].append({"role": "user", "parts": [text]})
 
     # Logique pour appeler Google Gemini
-    response_text = "Réponse simulée basée sur l'image et le texte."
+    try:
+        # Chargement de l'image vers Google Gemini
+        file = genai.upload_file(image_path, mime_type="image/jpeg")
+
+        # Création de la session de chat avec Google Gemini
+        chat_session = genai.GenerativeModel(
+            model_name="gemini-1.5-pro",
+            generation_config={
+                "temperature": 1,
+                "top_p": 0.95,
+                "top_k": 64,
+                "max_output_tokens": 8192,
+                "response_mime_type": "text/plain",
+            },
+        ).start_chat(
+            history=[
+                {"role": "user", "parts": [file, text]}
+            ]
+        )
+
+        # Envoi du message et obtention de la réponse
+        response = chat_session.send_message(text)
+        response_text = response.text
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
     session['history'].append({"role": "model", "parts": [response_text]})
 
