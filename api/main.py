@@ -50,9 +50,19 @@ def process_text_and_image():
         # Ajouter le message de l'utilisateur sans image
         session['history'].append({"role": "user", "parts": [text]})
 
-    # Créer la session de chat
-    chat_session = genai.ChatSession()
-    chat_session.add_history(session['history'])
+    # Créer la session de chat avec le modèle
+    generation_config = {
+        "temperature": 1,
+        "top_p": 0.95,
+        "top_k": 64,
+        "max_output_tokens": 8192,
+        "response_mime_type": "text/plain",
+    }
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config=generation_config
+    )
+    chat_session = model.start_chat(history=session['history'])
 
     # Envoyer le message et obtenir la réponse
     response = chat_session.send_message(text)
