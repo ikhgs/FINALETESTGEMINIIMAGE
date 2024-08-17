@@ -28,6 +28,40 @@ def download_image(url):
     else:
         raise Exception("Échec du téléchargement de l'image.")
 
+def generate_response_with_gemini(text, image_path=None):
+    """Appelle l'API Google Gemini pour générer une réponse basée sur le texte et l'image."""
+    if image_path:
+        # Télécharger l'image sur Gemini et obtenir un URI
+        image_file = genai.upload_file(image_path, mime_type="image/jpeg")
+
+        # Créer une session de chat avec l'historique et l'image
+        chat_session = genai.ChatSession(
+            model="gemini-1.5-pro",
+            temperature=1,
+            top_p=0.95,
+            top_k=64,
+            max_output_tokens=8192
+        )
+
+        chat_session.add_user_message(text)
+        chat_session.add_image(image_file)
+
+    else:
+        # Créer une session de chat sans image
+        chat_session = genai.ChatSession(
+            model="gemini-1.5-pro",
+            temperature=1,
+            top_p=0.95,
+            top_k=64,
+            max_output_tokens=8192
+        )
+        chat_session.add_user_message(text)
+
+    # Envoyer le message et obtenir la réponse
+    response = chat_session.generate()
+
+    return response.text
+
 @app.route('/api/pro_with_image', methods=['GET'])
 def process_text_and_image():
     text = request.args.get('text')
@@ -52,8 +86,8 @@ def process_text_and_image():
 
     session['history'].append({"role": "user", "parts": [text]})
 
-    # Logique pour appeler Google Gemini (ici, vous devriez appeler votre modèle Gemini)
-    response_text = "Réponse simulée basée sur l'image et le texte."
+    # Appel à Google Gemini pour générer la réponse
+    response_text = generate_response_with_gemini(text, image_path)
 
     session['history'].append({"role": "model", "parts": [response_text]})
 
@@ -62,3 +96,4 @@ def process_text_and_image():
 # Lancement de l'application
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+    
