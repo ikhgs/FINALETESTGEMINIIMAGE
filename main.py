@@ -1,74 +1,83 @@
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify
 import os
 import google.generativeai as genai
-import requests
-from secrets import token_hex
 
 app = Flask(__name__)
-app.secret_key = token_hex(16)  # Clé secrète pour gérer les sessions
-
-# Configuration de l'API Google Gemini
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
+# Configurez votre modèle
+generation_config = {
+    "temperature": 1,
+    "top_p": 0.95,
+    "top_k": 64,
+    "max_output_tokens": 8192,
+    "response_mime_type": "text/plain",
+}
+
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    generation_config=generation_config,
+)
+
+# Dictionnaire pour stocker l'historique des conversations
+conversation_history = {}
+
 def upload_to_gemini(path, mime_type=None):
-    """Télécharge le fichier sur Gemini et retourne le fichier."""
+    """Uploads the given file to Gemini."""
     file = genai.upload_file(path, mime_type=mime_type)
+    print(f"Uploaded file '{file.display_name}' as: {file.uri}")
     return file
 
-def download_image(url):
-    """Télécharge une image depuis une URL et l'enregistre localement."""
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open("temp_image.jpg", "wb") as f:
-            f.write(response.content)
-        return "temp_image.jpg"
-    else:
-        raise Exception("Échec du téléchargement de l'image.")
+@app.route('/api/bas', methods=['POST'])
+def api_bas():
+    if 'image' not in request.files or 'prompt' not in request.form:
+        return jsonify({"error": "Image and prompt are required"}), 400
 
-@app.route('/api/pro_with_image', methods=['GET'])
-def process_text_and_image():
-    """Traite le texte et l'image pour la première requête ou continue une conversation."""
-    text = request.args.get('text')
-    image_url = request.args.get('image_url')
+    image = request.files['image']
+    prompt = request.form['prompt']
+    user_id = 1  # Id utilisateur fixe pour cet exemple
 
-    if not text:
-        return jsonify({"error": "Le paramètre 'text' est requis."}), 400
+    # Sauvegarder l'image temporairement
+    image_path = 'temp_image.jpeg'
+    image.save(image_path)
 
-    # Initialisation de l'historique si ce n'est pas déjà fait
-    if 'history' not in session:
-        session['history'] = []
+    file = upload_to_gemini(image_path, mime_type="image/jpeg")
 
-    # Gérer les cas où l'image est fournie ou non
-    if image_url:
-        # Télécharger l'image et l'ajouter à Gemini
-        image_path = download_image(image_url)
-        image_file = upload_to_gemini(image_path)
+    # Démarrer ou poursuivre la session de chat
+    if user_id not in conversation_history:
+        conversation_history[user_id] = []
 
-        # Ajouter le message de l'utilisateur avec l'image
-        session['history'].append({"role": "user", "parts": [image_file, text]})
-    else:
-        # Ajouter le message de l'utilisateur sans image
-        session['history'].append({"role": "user", "parts": [text]})
-
-    # Créer la session de chat avec le modèle
-    generation_config = {
-        "temperature": 1,
-        "top_p": 0.95,
-        "top_k": 64,
-        "max_output_tokens": 8192,
-        "response_mime_type": "text/plain",
-    }
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        generation_config=generation_config
+    chat_session = model.start_chat(
+        history=conversation_history[user_id] + [
+            {
+                "role": "user",
+                "parts": [file, prompt],
+            }
+        ]
     )
-    chat_session = model.start_chat(history=session['history'])
-
-    # Envoyer le message et obtenir la réponse
-    response = chat_session.send_message(text)
     
-    # Ajouter la réponse du modèle à l'historique
-    session['history'].append({"role": "model", "parts": [response.text]})
+    # Enregistrer la session dans l'historique
+    conversation_history[user_id] = chat_session.history
+
+    response = chat_session.send_message(prompt)
+    return jsonify({"response": response.text})
+
+@app.route('/api/haut', methods=['GET'])
+def api_haut():
+    prompt = request.args.get('prompt')
+    user_id = 1  # Id utilisateur fixe pour cet exemple
+
+    if user_id not in conversation_history:
+        return jsonify({"error": "No conversation history found for this user"}), 404
+
+    chat_session = model.start_chat(
+        history=conversation_history[user_id]
+    )
+    
+    response = chat_session.send_message(prompt)
+    
+    # Enregistrer la mise à jour de la session dans l'historique
+    conversation_history[user_id] = chat_session.history
 
     return jsonify({"response": response.text})
 
