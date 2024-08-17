@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import google.generativeai as genai
 import requests
+import uuid
 
 app = Flask(__name__)
 
@@ -10,9 +11,6 @@ genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
 # Dictionnaire pour stocker les sessions de conversation par user_id
 chat_sessions = {}
-
-# Compteur global pour user_id
-current_user_id = 1
 
 def download_image(url):
     """Télécharge une image depuis une URL et l'enregistre localement."""
@@ -67,22 +65,20 @@ def start_or_continue_chat(user_id, text, image_url=None):
 
 @app.route('/api/pro_with_image', methods=['GET'])
 def process_text_and_image():
-    global current_user_id
-
+    user_id = request.args.get('user_id')  # Utiliser un user_id fixe fourni par l'utilisateur
     text = request.args.get('text')
     image_url = request.args.get('image_url')
 
     if not text:
         return jsonify({"error": "Missing 'text' parameter"}), 400
 
-    # Génère un user_id automatiquement
-    user_id = current_user_id
+    if not user_id:
+        # Si aucun user_id n'est fourni, créez un nouvel ID
+        user_id = str(uuid.uuid4())
 
     try:
         # Continue la conversation ou démarre une nouvelle session
         response_text = start_or_continue_chat(user_id, text, image_url)
-        # Incrémente l'ID pour le prochain utilisateur
-        current_user_id += 1
         return jsonify({"user_id": user_id, "response": response_text})
 
     except Exception as e:
@@ -90,21 +86,19 @@ def process_text_and_image():
 
 @app.route('/api/pro_text_only', methods=['GET'])
 def process_text_only():
-    global current_user_id
-
+    user_id = request.args.get('user_id')  # Utiliser un user_id fixe fourni par l'utilisateur
     text = request.args.get('text')
 
     if not text:
         return jsonify({"error": "Missing 'text' parameter"}), 400
 
-    # Génère un user_id automatiquement
-    user_id = current_user_id
+    if not user_id:
+        # Si aucun user_id n'est fourni, créez un nouvel ID
+        user_id = str(uuid.uuid4())
 
     try:
         # Continue la conversation avec uniquement du texte
         response_text = start_or_continue_chat(user_id, text)
-        # Incrémente l'ID pour le prochain utilisateur
-        current_user_id += 1
         return jsonify({"user_id": user_id, "response": response_text})
 
     except Exception as e:
